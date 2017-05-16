@@ -1,0 +1,194 @@
+#%RAML 1.0
+title: "Metadata service"
+description: "Metadata service API"
+version: 0.0.1
+mediaType: application/json
+baseUri: https://discovery.gig.tech
+
+securitySchemes:
+  itsyouonline: !include https://raw.githubusercontent.com/gig-cockpit/raml-definitions/master/securityScheme/iyo.raml
+
+resourceTypes:
+  collection: !include https://raw.githubusercontent.com/gig-cockpit/raml-definitions/master/resourceTypes/collection.raml
+  member: !include https://raw.githubusercontent.com/gig-cockpit/raml-definitions/master/resourceTypes/member.raml
+
+types:
+  AuthResponse:
+    properties:
+      id:
+        type: string
+        description: identifier of the Metadata service
+        minLength: 5
+        maxLength: 128
+        # pattern: TODO
+      timestamp:
+        type: integer
+        format: int64
+
+  ACLEntry:
+    description: ACL entry for a directory
+    properties:
+      read: boolean
+      write: boolean
+      delete: boolean
+      admin: boolean
+
+  AclCreate:
+    description: Mapping between a user ID and an ACLEntry
+    properties:
+      id:
+        description: ItYouOnline ID of the user link to this ACL
+        type: string
+        pattern: ^\w+$
+        required: true
+      acl:
+        type: ACLEntry
+        required: true
+  Acl:
+    type: AclCreate
+
+
+  Node:
+    properties:
+      name:
+        type: string
+        required: true
+        pattern: ^\w+$
+        minLength: 1
+        maxLength: 256
+      created:
+        type: datetime
+        required: false
+      updated:
+        type: datetime
+        required: false
+
+  Directory:
+    type: Node
+    properties:
+      children:
+        type: Node[]
+        required: true
+      acl:
+        type: Acl[]
+
+  Entry:
+    type: Node
+    properties:
+      value:
+        type: string
+
+securedBy: [ itsyouonline: {scopes: ["user:name"] } ]
+
+/users/{uid}/directories/{dirpath}:
+  uriParameters:
+    dirpath:
+      description: |
+        Full path to a directory.
+        Can be empty
+      example: /path/to/my/sub/directory
+      type: string
+      required: false
+  get:
+    description: List the content of a directory
+    responses:
+      200:
+        description: List content of a directory
+        body:
+          type:
+            properties:
+              directories: Directory[]
+              entries: Entry[]
+      404:
+        description: Not directory with this path or uid doesn't not exists
+  post:
+    description: |
+      Create a new directory
+    body:
+      properties:
+        name:
+          type: string
+          pattern: ^\w+$
+          minLength: 1
+          maxLength: 256
+    responses:
+      200:
+        description: |
+          Directory created succefully
+        body:
+          type: Directory
+      409:
+        description: |
+          Conflict. directory with this name already exists
+  delete:
+    description: |
+      Delete a directory
+    responses:
+      204:
+        description: |
+          Directory deleted succefully
+      404:
+        description: Not directory with this path or uid doesn't not exists
+  /acl:
+    type: collection
+    /{uid}:
+      type: member
+  /{entryname}.entry:
+    uriParameters:
+      entryname:
+        description: |
+          name of the entry
+    post:
+      description: |
+        Create new entry in a directory
+      body:
+        properties:
+          value:
+            type: string
+            required: true
+      responses:
+        200:
+          description: |
+            Entry created succefully
+          body:
+            Entry
+        409:
+          description: |
+            Conflict. Entry with this name already exists
+    put:
+      description: |
+        Update value of an existing entry
+      body:
+        properties:
+          value:
+            type: string
+            required: true
+      responses:
+        200:
+          description: |
+            Entry created succefully
+          body:
+            Entry
+        404:
+          description: |
+            Not entry foud with this name
+    get:
+      description: |
+        Get detail about an item in a directory
+      responses:
+        200:
+          body:
+            type: Entry
+        404:
+          description: |
+            Not item found with this name
+    delete:
+      description: |
+        Delete entry from a directory
+      responses:
+        204:
+          description: |
+            Entry deleted succefully
+        404:
+          description: |
+            Not item found with this name
